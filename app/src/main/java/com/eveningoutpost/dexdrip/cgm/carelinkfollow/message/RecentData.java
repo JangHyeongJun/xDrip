@@ -61,7 +61,7 @@ public class RecentData {
     }
 
     public boolean isCC() {
-        return getDeviceFamily().equals(DEVICE_FAMILY_NGP);
+        return getDeviceFamily().equals(DEVICE_FAMILY_CC);
     }
 
     public boolean isCGM() {

@@ -142,6 +142,7 @@ public class StatusLine {
             append(sb, PumpStatus.getBolusIoBString());
             sb.append(PumpStatus.getReservoirString());
             sb.append(PumpStatus.getBatteryString());
+            sb.append(PumpStatus.getBasalAbsoluteString());
         }
 
         if (Pref.getBooleanDefaultFalse("status_line_external_status")) {

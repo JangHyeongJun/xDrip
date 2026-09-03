@@ -58,3 +58,6 @@ patches/
 *.exe
 *.iml
 .claude/
+
+artifacts/
+.vscode/

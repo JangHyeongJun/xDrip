@@ -449,58 +449,94 @@ public class BgGraphBuilder {
 
             if (!aplist.isEmpty()) {
 
-                // divider line
+                // Determine whether to use basal_absolute (U/h) or basal_percent.
+                // CareLink follow stores absolute rates but has no basal profile,
+                // so basal_percent is invalid.  Detect this: if any record has
+                // basal_absolute > 0 while basal_percent <= 0, use absolute mode.
+                boolean useAbsolute = false;
+                for (APStatus item : aplist) {
+                    if (item.basal_absolute > 0 && item.basal_percent <= 0) {
+                        useAbsolute = true;
+                        break;
+                    }
+                }
 
-                final Line dividerLine = new Line();
-                dividerLine.setTag("tbr"); // not quite true
-                dividerLine.setHasPoints(false);
-                dividerLine.setHasLines(true);
-                dividerLine.setStrokeWidth(1);
-                dividerLine.setColor(getCol(X.color_basal_tbr));
-                dividerLine.setPathEffect(new DashPathEffect(new float[]{10.0f, 10.0f}, 0));
-                dividerLine.setReverseYAxis(true);
-                dividerLine.setHasPoints(false);
+                // divider line — only meaningful for percent mode
+                if (!useAbsolute) {
+                    final Line dividerLine = new Line();
+                    dividerLine.setTag("tbr"); // not quite true
+                    dividerLine.setHasPoints(false);
+                    dividerLine.setHasLines(true);
+                    dividerLine.setStrokeWidth(1);
+                    dividerLine.setColor(getCol(X.color_basal_tbr));
+                    dividerLine.setPathEffect(new DashPathEffect(new float[]{10.0f, 10.0f}, 0));
+                    dividerLine.setReverseYAxis(true);
+                    dividerLine.setHasPoints(false);
 
-                final float one_hundred_percent = (100 * yscale) / 100f;
-                final List<PointValue> divider_points = new ArrayList<>(2);
-                divider_points.add(new HPointValue((double) loaded_start / FUZZER, one_hundred_percent));
-                dividerLine.setPointRadius(0);
-                divider_points.add(new HPointValue((double) loaded_end / FUZZER, one_hundred_percent));
-                dividerLine.setValues(divider_points);
-                basalLines.add(dividerLine);
+                    final float one_hundred_percent = (100 * yscale) / 100f;
+                    final List<PointValue> divider_points = new ArrayList<>(2);
+                    divider_points.add(new HPointValue((double) loaded_start / FUZZER, one_hundred_percent));
+                    dividerLine.setPointRadius(0);
+                    divider_points.add(new HPointValue((double) loaded_end / FUZZER, one_hundred_percent));
+                    dividerLine.setValues(divider_points);
+                    basalLines.add(dividerLine);
+                }
 
                 final List<PointValue> points = new ArrayList<>(aplist.size());
 
                 int last_percent = -1;
+                double last_absolute = Double.MIN_VALUE;
                 double last_timestamp = Double.MIN_VALUE;
 
                 int count = aplist.size();
                 for (APStatus item : aplist) {
-                    val sanitized_percent = Math.min(BgReading.BG_READING_MAXIMUM_VALUE, Math.max(0, item.basal_percent)); // percent value plotted on glucose axis; capped to prevent Y-axis growth
-                    if (--count == 0 || (sanitized_percent != last_percent)) {
-                        float this_ypos = (sanitized_percent * yscale) / 100f;
-                        this_ypos = clampNonGlucoseY(this_ypos + panCompensationOffset);
-                        final double fuzzedT = (double) item.timestamp / FUZZER;
-                        if (fuzzedT != last_timestamp) {
-                            points.add(new HPointValue(fuzzedT, this_ypos));
-                            last_timestamp = fuzzedT;
+
+                    final float this_ypos;
+                    final boolean changed;
+
+                    if (useAbsolute) {
+                        // Plot absolute U/h on the chart bottom.
+                        // Scale x4 so 0.6 U/h ≈ 43 mg/dL height (~11% of chart).
+                        final double absolute = Math.max(0, item.basal_absolute);
+                        changed = (--count == 0) || (absolute != last_absolute);
+                        if (changed) {
+                            this_ypos = clampNonGlucoseY((float) (absolute * 4 * yscale) + panCompensationOffset);
+                            last_absolute = absolute;
+                        } else {
+                            continue;
+                        }
+                    } else {
+                        val sanitized_percent = Math.min(BgReading.BG_READING_MAXIMUM_VALUE, Math.max(0, item.basal_percent));
+                        changed = (--count == 0) || (sanitized_percent != last_percent);
+                        if (changed) {
+                            this_ypos = clampNonGlucoseY((sanitized_percent * yscale) / 100f + panCompensationOffset);
                             last_percent = sanitized_percent;
                         } else {
-                            UserError.Log.d(TAG, "EXCLUDING APSTAT: " + fuzzedT + " " + this_ypos);
+                            continue;
                         }
+                    }
+
+                    final double fuzzedT = (double) item.timestamp / FUZZER;
+                    if (fuzzedT != last_timestamp) {
+                        points.add(new HPointValue(fuzzedT, this_ypos));
+                        last_timestamp = fuzzedT;
+                    } else {
+                        UserError.Log.d(TAG, "EXCLUDING APSTAT: " + fuzzedT + " " + this_ypos);
                     }
                 }
 
                 final Line line = new Line(points);
                 line.setFilled(true);
-                line.setFillFlipped(true);
+                if (!useAbsolute) {
+                    line.setFillFlipped(true);
+                    line.setReverseYAxis(true);
+                }
                 line.setHasGradientToTransparent(true);
                 line.setHasPoints(false);
                 line.setStrokeWidth(1);
                 line.setHasLines(true);
                 line.setSquare(true);
                 line.setPointRadius(1);
-                line.setReverseYAxis(true);
                 line.setBackgroundUnclipped(true);
                 line.setGradientDivider(10f);
                 line.setColor(getCol(X.color_basal_tbr));
