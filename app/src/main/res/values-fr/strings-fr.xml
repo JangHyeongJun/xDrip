@@ -1786,7 +1786,7 @@
     <string name="Dose">Dose</string>
     <string name="choose_type">Choisir le type</string>
     <string name="invalid_serial">Numéro de série invalide</string>
-    <string name="set_pen_to_format">Définir le stylo %s à %s</string>
+    <string name="set_pen_to_format">Définir le stylo %1$s à %2$s</string>
     <string name="pen_contains_which_insulin_type">Le Stylo %s contient quel type d\'insuline?</string>
     <string name="allow_do_not_disturb_text">Pour pouvoir avoir la possibilité optionnelle d\'alerter même lorsque la fonction Android Ne-Pas-Déranger est activée, veuillez autoriser cette autorisation xDrip dans les paramètres du système sur la page suivante</string>
     <string name="graphical_editor_for_pump_basal">Éditeur graphique pour les profils basal de la pompe</string>

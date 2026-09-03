@@ -1826,7 +1826,7 @@ môže spôsobovať pády alebo zamrznutia telefónu! Klepnutím otestujte predt
     <string name="Dose">Dávka</string>
     <string name="choose_type">Vybrat druh inzulínu</string>
     <string name="invalid_serial">Neplatné sériové číslo</string>
-    <string name="set_pen_to_format">Nastavit inzulínové pero %s na %s</string>
+    <string name="set_pen_to_format">Nastavit inzulínové pero %1$s na %2$s</string>
     <string name="pen_contains_which_insulin_type">Jaký typ inzulínu je v inzulínovém peru%s?</string>
     <string name="allow_do_not_disturb_text">Chcete-li mít možnost dostávat upozornění a výstrahy i v případě, že zařízení bude v režimu Nerušit, udělte aplikaci xDrip+ toto oprávnění v nastavení systému na další stránce</string>
     <string name="graphical_editor_for_pump_basal">Grafický editor pro bazální profily pumpy</string>

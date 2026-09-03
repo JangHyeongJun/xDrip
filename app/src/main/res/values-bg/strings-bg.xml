@@ -1829,7 +1829,7 @@
     <string name="Dose">Доза</string>
     <string name="choose_type">Избор на тип</string>
     <string name="invalid_serial">Невалиден сериен</string>
-    <string name="set_pen_to_format">Настрой Писалка %s до %s</string>
+    <string name="set_pen_to_format">Настрой Писалка %1$s до %2$s</string>
     <string name="pen_contains_which_insulin_type">Писалка %s кой тип инсулин ползва?</string>
     <string name="allow_do_not_disturb_text">За да имате възможност за известия, дори когато андроид е в режим не ме безпокой, моля разрешете на xDrip достъп до системата на следваща страница</string>
     <string name="graphical_editor_for_pump_basal">Графичен редактор за помпа базални профили</string>

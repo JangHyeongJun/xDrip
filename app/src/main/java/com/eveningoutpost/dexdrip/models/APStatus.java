@@ -167,11 +167,47 @@ public class APStatus extends PlusModel {
     }
 
 
+    public static List<APStatus> latestSince(int limit, long startTime) {
+        try {
+            return new Select()
+                    .from(APStatus.class)
+                    .where("timestamp > " + Math.max(startTime, 0))
+                    .orderBy("timestamp asc")
+                    .limit(limit)
+                    .execute();
+        } catch (android.database.sqlite.SQLiteException e) {
+            updateDB();
+            return new ArrayList<>();
+        }
+    }
+
     public static List<APStatus> cleanup(int retention_days) {
         return new Delete()
                 .from(APStatus.class)
                 .where("timestamp < ?", JoH.tsl() - (retention_days * 86400000L))
                 .execute();
+    }
+
+    /**
+     * Create an APStatus record at the given timestamp without deduplication.
+     * Used by CareLink follow to record every 5-minute auto basal slot so that
+     * Nightscout receives complete coverage even when the rate is unchanged.
+     * If a record already exists at this timestamp (from a previous poll),
+     * it is silently ignored via the UNIQUE constraint IGNORE strategy.
+     */
+    public static APStatus createRecordAtTimestamp(long timestamp_ms, double basal_absolute) {
+        final APStatus fresh = APStatus.builder()
+                .timestamp(timestamp_ms)
+                .basal_absolute(basal_absolute)
+                .basal_percent(Profile.getBasalRatePercentFromAbsolute(timestamp_ms, basal_absolute))
+                .build();
+        try {
+            fresh.save();
+            if (d) UserError.Log.d(TAG, "Basal slot record: " + fresh.toS());
+        } catch (Exception e) {
+            if (d) UserError.Log.d(TAG, "Duplicate basal slot at " + JoH.dateTimeText(timestamp_ms));
+        }
+        return fresh;
     }
 
 

@@ -1830,7 +1830,7 @@
     <string name="Dose">Dos</string>
     <string name="choose_type">Välj en typ</string>
     <string name="invalid_serial">Ogiltigt serienummer</string>
-    <string name="set_pen_to_format">Ställ in pennan %s på %s</string>
+    <string name="set_pen_to_format">Ställ in pennan %1$s på %2$s</string>
     <string name="pen_contains_which_insulin_type">Vilken typ av insulin innehåller pennan %s?</string>
     <string name="allow_do_not_disturb_text">För att ha möjligheten att varna även när Android har stör ej-läget aktiverat behöver du ge xDrip denna behörighet i systeminställningarna på nästa sida</string>
     <string name="graphical_editor_for_pump_basal">Grafisk redigerare för pumpens basalprofiler</string>

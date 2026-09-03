@@ -1262,6 +1262,8 @@
     <string name="title_send_dexcom_transmitter_battery_to_nightscout">Upload Dexcom battery</string>
     <string name="summary_send_treatments_to_nightscout">Send treatment data to Nightscout. Uncheck if your careportal is broken.</string>
     <string name="title_send_treatments_to_nightscout">Upload treatments</string>
+    <string name="summary_send_basal_to_nightscout">Upload Temp Basal treatment data from pump status to Nightscout for basal graph display.</string>
+    <string name="title_send_basal_to_nightscout">Upload basal rates</string>
     <string name="summary_warn_nightscout_failures">Display and sound a notification if Nightscout upload is failing.</string>
     <string name="title_warn_nightscout_failures">Alert on failures</string>
     <string name="summary_warn_nightscout_multi_site_upload_failure">xDrip clears the upload queue even if only one site has a successful upload, leaving others incomplete. This notifies you, allowing you to backfill as needed.</string>
@@ -1884,7 +1886,7 @@
     <string name="Dose">Dose</string>
     <string name="choose_type">Choose Type</string>
     <string name="invalid_serial">Invalid serial</string>
-    <string name="set_pen_to_format">Set Pen %s to %s</string>
+    <string name="set_pen_to_format">Set Pen %1$s to %2$s</string>
     <string name="pen_contains_which_insulin_type">PEN %s contains which insulin type?</string>
     <string name="allow_do_not_disturb_text">To be able to have the optional ability to alert even when Android Do-Not-Disturb is enabled, please allow xDrip this permission in the system settings on the next page</string>
     <string name="graphical_editor_for_pump_basal">Graphical editor for pump basal profiles</string>

@@ -1659,7 +1659,7 @@
     <string name="Dose">Dosis</string>
     <string name="choose_type">Kies type</string>
     <string name="invalid_serial">Ongeldig serienummer</string>
-    <string name="set_pen_to_format">Zet Pen %s naar %s</string>
+    <string name="set_pen_to_format">Zet Pen %1$s naar %2$s</string>
     <string name="pen_contains_which_insulin_type">Welk type insuline bevat pen %s?</string>
     <string name="allow_do_not_disturb_text">Om de optionele mogelijkheid te hebben om te waarschuwen, zelfs als Android Niet-Storen is ingeschakeld, geef xDrip deze toestemming in de systeeminstellingen op de volgende pagina</string>
     <string name="graphical_editor_for_pump_basal">Grafische editor voor pomp basale profielen</string>

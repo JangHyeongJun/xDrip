@@ -1778,7 +1778,7 @@
     <string name="Dose">용량</string>
     <string name="choose_type">유형 선택</string>
     <string name="invalid_serial">유효하지 않은 시리얼</string>
-    <string name="set_pen_to_format">%s 펜을 %s로 설정</string>
+    <string name="set_pen_to_format">%1$s 펜을 %2$s로 설정</string>
     <string name="pen_contains_which_insulin_type">펜 %s에는 어떤 인슐린 유형이 들어있습니까?</string>
     <string name="allow_do_not_disturb_text">안드로이드 \'방해 금지 모드\'가 켜져 있어도 알림을 받을 수 있는 옵션을 사용하려면, 다음 페이지의 시스템 설정에서 xDrip에 권한을 허용해 주세요</string>
     <string name="graphical_editor_for_pump_basal">펌프 기초량 프로필용 그래픽 편집기</string>

@@ -6,6 +6,7 @@ import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
 
 import com.eveningoutpost.dexdrip.RobolectricTestWithConfig;
+import com.eveningoutpost.dexdrip.models.APStatus;
 import com.eveningoutpost.dexdrip.models.BgReading;
 import com.eveningoutpost.dexdrip.models.BloodTest;
 import com.eveningoutpost.dexdrip.models.Calibration;
@@ -21,8 +22,10 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -31,6 +34,7 @@ import java.util.zip.GZIPInputStream;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
+import retrofit2.Retrofit;
 
 /**
  * Caller-level integration tests for {@link NightscoutUploader} using MockWebServer.
@@ -65,10 +69,17 @@ public class NightscoutUploaderCallerTest extends RobolectricTestWithConfig {
         server.start(InetAddress.getByName(LOOPBACK_HOST), 0);
         prefs = PreferenceManager.getDefaultSharedPreferences(
                 org.robolectric.RuntimeEnvironment.application);
+        APStatus.updateDB();
+        APStatus.cleanup(0);
+        PersistentStore.setLong("nightscout-rest-basal-synced-time", 0);
+        Pref.setBoolean("send_basal_to_nightscout", false);
     }
 
     @After
     public void tearDown() throws IOException {
+        APStatus.cleanup(0);
+        PersistentStore.setLong("nightscout-rest-basal-synced-time", 0);
+        Pref.setBoolean("send_basal_to_nightscout", false);
         if (server != null) {
             server.shutdown();
         }
@@ -205,9 +216,51 @@ public class NightscoutUploaderCallerTest extends RobolectricTestWithConfig {
         assertThat(server.getRequestCount()).isEqualTo(0);
     }
 
+    @Test
+    public void uploadRest_basalTreatmentsUseNextApStatusBoundaryForDuration() throws Exception {
+        createApStatusRecord(1774437687000L, 0.3d);
+        createApStatusRecord(1774438287000L, 0d);
+        createApStatusRecord(1774438888000L, 0.3d);
+        createApStatusRecord(1774439188000L, 0d);
+        createApStatusRecord(1774439487000L, 0.6d);
+
+        enqueueSuccessResponses(3);
+
+        final NightscoutUploader uploader = new NightscoutUploader(
+            org.robolectric.RuntimeEnvironment.application);
+        final Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl(server.url("/api/v1/").toString())
+                .build();
+        final NightscoutUploader.NightscoutService service =
+                retrofit.create(NightscoutUploader.NightscoutService.class);
+        final Method postBasalTreatments = NightscoutUploader.class.getDeclaredMethod(
+                "postBasalTreatments",
+                NightscoutUploader.NightscoutService.class,
+                String.class);
+        postBasalTreatments.setAccessible(true);
+
+        postBasalTreatments.invoke(uploader, service, EXPECTED_HASHED_SECRET);
+
+        final List<JSONObject> treatments = findTreatmentRequests();
+        assertThat(treatments).hasSize(3);
+
+        assertThat(treatments.get(0).getLong("timestamp")).isEqualTo(1774437687000L);
+        assertThat(treatments.get(0).getLong("duration")).isEqualTo(10L);
+
+        assertThat(treatments.get(1).getLong("timestamp")).isEqualTo(1774438888000L);
+        assertThat(treatments.get(1).getLong("duration")).isEqualTo(5L);
+
+        assertThat(treatments.get(2).getLong("timestamp")).isEqualTo(1774439487000L);
+        assertThat(treatments.get(2).getLong("duration")).isEqualTo(5L);
+    }
+
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
+
+    private static void createApStatusRecord(long timestamp, double basalAbsolute) {
+        new APStatus(timestamp, -1, basalAbsolute).save();
+    }
 
     private static BgReading createBgReading(double calculatedValue, long timestamp) {
         final BgReading bg = new BgReading();
@@ -250,6 +303,20 @@ public class NightscoutUploaderCallerTest extends RobolectricTestWithConfig {
             }
         }
         return null;
+    }
+
+    private List<JSONObject> findTreatmentRequests() throws Exception {
+        final List<JSONObject> matches = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            final RecordedRequest req = server.takeRequest(2, TimeUnit.SECONDS);
+            if (req == null) {
+                break;
+            }
+            if (req.getPath() != null && req.getPath().startsWith("/api/v1/treatments") && "PUT".equals(req.getMethod())) {
+                matches.add(new JSONObject(decompressIfNeeded(req)));
+            }
+        }
+        return matches;
     }
 
     /**

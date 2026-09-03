@@ -1734,7 +1734,7 @@
     <string name="Dose">Dawka</string>
     <string name="choose_type">Wybierz typ</string>
     <string name="invalid_serial">Nieprawidłowy numer seryjny</string>
-    <string name="set_pen_to_format">Ustaw pen %s na %s</string>
+    <string name="set_pen_to_format">Ustaw pen %1$s na %2$s</string>
     <string name="pen_contains_which_insulin_type">PEN %s zawiera jaki rodzaj insuliny?</string>
     <string name="allow_do_not_disturb_text">Aby xDrip miał ewentualną możliwość włączenia alarmów, nawet gdy funkcja systemu Android \"Nie Przeszkadzaj\" jest włączona, proszę zezwolić na to w ustawieniach systemu na następnej stronie</string>
     <string name="graphical_editor_for_pump_basal">Edytor graficzny dla profili bazowych pompy</string>

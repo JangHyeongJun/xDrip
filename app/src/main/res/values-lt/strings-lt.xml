@@ -1687,7 +1687,7 @@
     <string name="Dose">Dozė</string>
     <string name="choose_type">Pasirinkti tipą</string>
     <string name="invalid_serial">Neteisingas SN</string>
-    <string name="set_pen_to_format">Nustatyti peną %s į %s</string>
+    <string name="set_pen_to_format">Nustatyti peną %1$s į %2$s</string>
     <string name="pen_contains_which_insulin_type">Koks %s pene naudojamas insulinas?</string>
     <string name="allow_do_not_disturb_text">Kad girdėtumėte aliarmus net kai telefone įjungtas Netrukdymo režimas, suteikite xDrip leidimą nustatymų sekančiame lange</string>
     <string name="graphical_editor_for_pump_basal">Grafinis pompos bazės profilių redaktorius</string>

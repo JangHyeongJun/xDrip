@@ -71,6 +71,7 @@ public class Treatments extends Model {
 
     public static final String SENSOR_START_EVENT_TYPE = "Sensor Start";
     public static final String SENSOR_STOP_EVENT_TYPE = "Sensor Stop";
+    public static final String SITE_CHANGE_EVENT_TYPE = "Site Change";
     private static final String DEFAULT_EVENT_TYPE = "<none>";
 
     public final static String XDRIP_TAG = "xdrip";
@@ -368,6 +369,42 @@ public class Treatments extends Model {
 
         pushTreatmentSync(treatment, is_new, suggested_uuid);
         if (is_new) UndoRedo.addUndoTreatment(treatment.uuid);
+
+        return treatment;
+    }
+
+    public static synchronized Treatments createEvent(final String eventType, final String notes, long timestamp, final String eventUuid) {
+        Log.d(TAG, "Creating event treatment: " + eventType + " " + notes);
+
+        if (timestamp == 0) {
+            timestamp = new Date().getTime();
+        }
+
+        if (emptyString(eventType)) {
+            Log.i(TAG, "Empty event type - not saving");
+            return null;
+        }
+
+        fixUpTable();
+
+        if (!emptyString(eventUuid)) {
+            final Treatments existing = byuuid(eventUuid);
+            if (existing != null) {
+                return existing;
+            }
+        }
+
+        final Treatments treatment = new Treatments();
+        treatment.eventType = eventType;
+        treatment.notes = notes != null ? notes : "";
+        treatment.timestamp = timestamp;
+        treatment.created_at = DateUtil.toISOString(timestamp);
+        treatment.uuid = !emptyString(eventUuid) ? eventUuid : UUID.randomUUID().toString();
+        treatment.enteredBy = XDRIP_TAG;
+        treatment.save();
+
+        pushTreatmentSync(treatment, true, null);
+        UndoRedo.addUndoTreatment(treatment.uuid);
 
         return treatment;
     }

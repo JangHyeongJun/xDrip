@@ -1758,7 +1758,7 @@
     <string name="Dose">Доза</string>
     <string name="choose_type">Виберіть тип</string>
     <string name="invalid_serial">Невірний серійний номер</string>
-    <string name="set_pen_to_format">Встановити ручку %s на %s</string>
+    <string name="set_pen_to_format">Встановити ручку %1$s на %2$s</string>
     <string name="pen_contains_which_insulin_type">Ручка %s містить який тип інсуліну?</string>
     <string name="allow_do_not_disturb_text">Щоб можна було отримувати попередження навіть при увімкнутому режимі телефону Do-Not-Disturb - Не турбувати, будь ласка, дозвольте xDrip цей дозвіл у налаштуваннях системи на наступній сторінці</string>
     <string name="graphical_editor_for_pump_basal">Графічний редактор для базальних профілів помпи</string>

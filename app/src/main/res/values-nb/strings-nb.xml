@@ -1833,7 +1833,7 @@
     <string name="Dose">Dose</string>
     <string name="choose_type">Velg type</string>
     <string name="invalid_serial">Ugyldig serienummer</string>
-    <string name="set_pen_to_format">Sett pennen %s til %s</string>
+    <string name="set_pen_to_format">Sett pennen %1$s til %2$s</string>
     <string name="pen_contains_which_insulin_type">PENN %s inneholder hvilken insulintype?</string>
     <string name="allow_do_not_disturb_text">For å kunne ha den valgfrie muligheten til å varsle selv når Android Ikke-forstyrr er aktivert, vennligst gi xDrip denne tillatelsen i systeminnstillingene på neste side</string>
     <string name="graphical_editor_for_pump_basal">Grafisk-redigerer for pumpebasalprofiler</string>

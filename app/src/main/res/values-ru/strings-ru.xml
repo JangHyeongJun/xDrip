@@ -1739,7 +1739,7 @@
     <string name="Dose">Дозировка</string>
     <string name="choose_type">Выберите тип</string>
     <string name="invalid_serial">Неверный серийный номер</string>
-    <string name="set_pen_to_format">Настроить ручку %s на %s</string>
+    <string name="set_pen_to_format">Настроить ручку %1$s на %2$s</string>
     <string name="pen_contains_which_insulin_type">Какой тип инсулина находится в ручке %s?</string>
     <string name="allow_do_not_disturb_text">Чтобы иметь возможность настроить сигналы даже при включенном режиме \"Не беспокоить\" Android, дайте xDrip+ это разрешение в системных настройках на следующей странице</string>
     <string name="graphical_editor_for_pump_basal">Графический редактор для базальных профилей помпы</string>

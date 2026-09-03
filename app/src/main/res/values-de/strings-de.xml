@@ -1755,7 +1755,7 @@
     <string name="Dose">Dosis</string>
     <string name="choose_type">Typ auswählen</string>
     <string name="invalid_serial">Ungültige Seriennummer</string>
-    <string name="set_pen_to_format">Setze Pen %s auf %s</string>
+    <string name="set_pen_to_format">Setze Pen %1$s auf %2$s</string>
     <string name="pen_contains_which_insulin_type">PEN %s enthält welchen Insulintyp?</string>
     <string name="allow_do_not_disturb_text">Um die optionale Möglichkeit zur Benachrichtigung auch bei aktiviertem Android Nicht-Stören haben zu können, erlauben Sie xDrip bitte diese Berechtigung in den Systemeinstellungen auf der nächsten Seite</string>
     <string name="graphical_editor_for_pump_basal">Grafischer Editor für Pumpenbasalprofile</string>

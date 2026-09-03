@@ -1604,7 +1604,7 @@
     <string name="Dose">Dose</string>
     <string name="choose_type">Escolha o tipo</string>
     <string name="invalid_serial">Número de série inválido</string>
-    <string name="set_pen_to_format">Define a Caneta %s para %s</string>
+    <string name="set_pen_to_format">Define a Caneta %1$s para %2$s</string>
     <string name="pen_contains_which_insulin_type">PEN %s contém qual tipo de insulina?</string>
     <string name="allow_do_not_disturb_text">Para poder ter a capacidade opcional de alertar mesmo quando o Android Não-Incomodar está ativo, por favor habilite essa permissão para o xDrip nas configurações do sistema na próxima página</string>
     <string name="graphical_editor_for_pump_basal">Editor gráfico para perfis basais de bomba</string>
