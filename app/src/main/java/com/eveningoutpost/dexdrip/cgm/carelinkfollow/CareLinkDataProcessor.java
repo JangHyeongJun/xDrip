@@ -21,7 +21,11 @@ import com.eveningoutpost.dexdrip.cgm.carelinkfollow.message.RecentData;
 import com.eveningoutpost.dexdrip.cgm.carelinkfollow.message.SensorGlucose;
 import com.eveningoutpost.dexdrip.cgm.carelinkfollow.message.TextMap;
 import com.eveningoutpost.dexdrip.g5model.DexSessionKeeper;
+import com.eveningoutpost.dexdrip.xdrip;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.PrintWriter;
 import java.text.SimpleDateFormat;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -49,9 +53,11 @@ public class CareLinkDataProcessor {
     private static final String SENSOR_CONNECTED_MESSAGE = "Sensor Connected";
     private static final long SENSOR_START_DEDUP_WINDOW_MS = Constants.MINUTE_IN_MS * 15;
     private static final long MAX_CARELINK_SENSOR_AGE_MS = Constants.DAY_IN_MS * 15;
+    private static final long MAX_WARMUP_INFERRED_AGE_MS = Constants.HOUR_IN_MS * 6;
 
     private static final double AUTO_BASAL_MARKER_TO_HOURLY_RATE = 12d;
     private static final long AUTO_BASAL_SLOT_DURATION_MS = Constants.MINUTE_IN_MS * 5;
+    private static final long MAX_PUMP_DIAGNOSTIC_LOG_BYTES = 1024 * 1024;
 
     private static long getSensorAgeMillis(final RecentData recentData) {
         if (recentData == null) {
@@ -166,29 +172,44 @@ public class CareLinkDataProcessor {
     }
 
     private static void ensureSensorStartTreatment(final long timestamp, final String notes) {
-        final Treatments lastSensorStart = Treatments.lastEventTypeFromXdrip(Treatments.SENSOR_START_EVENT_TYPE);
-        if (lastSensorStart == null || Math.abs(lastSensorStart.timestamp - timestamp) >= SENSOR_START_DEDUP_WINDOW_MS) {
-            String finalNotes = notes != null ? notes : "";
-            try {
-                long warmupMs = DexSessionKeeper.getWarmupPeriod();
-                if (warmupMs > 0) {
-                    long now = JoH.tsl();
-                    long elapsed = now - timestamp;
-                    if (elapsed < warmupMs) {
-                        long remaining = Math.max(0L, warmupMs - elapsed);
-                        long mins = Math.round((double) remaining / (double) Constants.MINUTE_IN_MS);
-                        finalNotes = finalNotes + " (warmup remaining: " + mins + " min)";
-                    }
-                }
-            } catch (Exception e) {
-                UserError.Log.d(TAG, "Could not compute warmup remaining: " + e);
-            }
-            Treatments.sensorStart(timestamp, finalNotes);
+        final Treatments existingStart = Treatments.byTimestamp(timestamp, SENSOR_START_DEDUP_WINDOW_MS);
+        if (existingStart != null && Treatments.SENSOR_START_EVENT_TYPE.equals(existingStart.eventType)) {
+            UserError.Log.d(TAG, "Skipping duplicate CareLink sensor start at " + JoH.dateTimeText(timestamp));
+            return;
         }
+
+        String finalNotes = notes != null ? notes : "";
+        try {
+            long warmupMs = DexSessionKeeper.getWarmupPeriod();
+            if (warmupMs > 0) {
+                long now = JoH.tsl();
+                long elapsed = now - timestamp;
+                if (elapsed < warmupMs) {
+                    long remaining = Math.max(0L, warmupMs - elapsed);
+                    long mins = Math.round((double) remaining / (double) Constants.MINUTE_IN_MS);
+                    finalNotes = finalNotes + " (warmup remaining: " + mins + " min)";
+                }
+            }
+        } catch (Exception e) {
+            UserError.Log.d(TAG, "Could not compute warmup remaining: " + e);
+        }
+        Treatments.sensorStart(timestamp, finalNotes);
     }
 
     private static void syncSensorSession(final RecentData recentData) {
-        final Long inferredStartTimestamp = inferSensorStartTimestamp(recentData);
+        Long inferredStartTimestamp = inferSensorStartTimestamp(recentData);
+        final Long connectedTimestamp = getSensorConnectedTimestamp(recentData);
+        final boolean confirmedBySensorConnected = connectedTimestamp != null;
+        final boolean sensorIsWarmingUp = RecentData.SENSOR_STATE_WARM_UP.equals(recentData.sensorState);
+
+        // Some CareLink CGM responses keep an old duration and omit the start event
+        // during warm-up. Treat the first live warm-up observation as the start.
+        if (sensorIsWarmingUp && (inferredStartTimestamp == null
+                || JoH.tsl() - inferredStartTimestamp > MAX_WARMUP_INFERRED_AGE_MS)) {
+            inferredStartTimestamp = JoH.tsl();
+            UserError.Log.i(TAG, "Using current CareLink warm-up observation as sensor start");
+        }
+
         if (inferredStartTimestamp == null || inferredStartTimestamp <= 0) {
             return;
         }
@@ -199,13 +220,20 @@ public class CareLinkDataProcessor {
         }
 
         final Sensor currentSensor = Sensor.currentSensor();
-        final Long connectedTimestamp = getSensorConnectedTimestamp(recentData);
-        final boolean confirmedBySensorConnected = connectedTimestamp != null;
+        final boolean confirmedSensorStart = confirmedBySensorConnected || sensorIsWarmingUp;
+
+        if (sensorIsWarmingUp && currentSensor != null) {
+            ensureSensorStartTreatment(currentSensor.started_at, "Started by CareLink sensor warm-up");
+            UserError.Log.i(TAG, "Keeping existing CareLink sensor session during warm-up at "
+                    + JoH.dateTimeText((long) currentSensor.started_at));
+            return;
+        }
 
         if (currentSensor == null) {
             Sensor.create(inferredStartTimestamp);
-            if (confirmedBySensorConnected) {
-                ensureSensorStartTreatment(inferredStartTimestamp, "Started by CareLink sensor connected");
+            if (confirmedSensorStart) {
+                ensureSensorStartTreatment(inferredStartTimestamp, sensorIsWarmingUp
+                        ? "Started by CareLink sensor warm-up" : "Started by CareLink sensor connected");
             }
             UserError.Log.i(TAG, "Created CareLink sensor session at " + JoH.dateTimeText(inferredStartTimestamp)
                     + (confirmedBySensorConnected ? " (sensor connected)" : " (age inference)"));
@@ -213,9 +241,10 @@ public class CareLinkDataProcessor {
         }
 
         if (currentSensor.started_at + SENSOR_START_DEDUP_WINDOW_MS < inferredStartTimestamp) {
-            if (confirmedBySensorConnected) {
+            if (confirmedSensorStart) {
                 Sensor.create(inferredStartTimestamp);
-                ensureSensorStartTreatment(inferredStartTimestamp, "Started by CareLink sensor connected");
+                ensureSensorStartTreatment(inferredStartTimestamp, sensorIsWarmingUp
+                        ? "Started by CareLink sensor warm-up" : "Started by CareLink sensor connected");
                 UserError.Log.i(TAG, "Started new CareLink sensor session at " + JoH.dateTimeText(inferredStartTimestamp));
             } else {
                 UserError.Log.d(TAG, "Skipping sensor session change from age inference (inferred: "
@@ -224,10 +253,11 @@ public class CareLinkDataProcessor {
             return;
         }
 
-        if (confirmedBySensorConnected && inferredStartTimestamp + SENSOR_START_DEDUP_WINDOW_MS < currentSensor.started_at) {
+        if (confirmedSensorStart && inferredStartTimestamp + SENSOR_START_DEDUP_WINDOW_MS < currentSensor.started_at) {
             currentSensor.started_at = inferredStartTimestamp;
             currentSensor.save();
-            ensureSensorStartTreatment(inferredStartTimestamp, "Start time updated from CareLink sensor connected");
+            ensureSensorStartTreatment(inferredStartTimestamp, sensorIsWarmingUp
+                    ? "Start time updated from CareLink sensor warm-up" : "Start time updated from CareLink sensor connected");
             UserError.Log.i(TAG, "Updated CareLink sensor start time to " + JoH.dateTimeText(inferredStartTimestamp));
         }
     }
@@ -306,17 +336,113 @@ public class CareLinkDataProcessor {
             return;
         }
 
-        final String note = "CareLink inferred reservoir refill: "
+        final String note = "CareLink inferred "
+                + (reservoirChange.infusionSetChange ? "infusion set change" : "reservoir refill") + ": "
                 + JoH.qs(reservoirChange.previousReservoir, 1)
                 + "U -> "
                 + JoH.qs(reservoirChange.currentReservoir, 1)
                 + "U";
-        final String eventUuid = UUID.nameUUIDFromBytes(("carelink-reservoir-site-change:" + reservoirChange.timestamp)
+        final String eventUuid = UUID.nameUUIDFromBytes(("carelink-reservoir-site-change:"
+                + reservoirChange.infusionSetChange + ":" + reservoirChange.timestamp)
                 .getBytes(StandardCharsets.UTF_8)).toString();
         Treatments.createEvent(Treatments.SITE_CHANGE_EVENT_TYPE, note, reservoirChange.timestamp, eventUuid);
     }
 
+    private static boolean hasUserBolusNearTimestamp(final RecentData recentData, final long timestamp) {
+        if (recentData == null || recentData.markers == null) {
+            return false;
+        }
+        for (final Marker marker : recentData.markers) {
+            if (marker == null || !Marker.MARKER_TYPE_INSULIN.equals(marker.type) || marker.getDate() == null) {
+                continue;
+            }
+            if (Math.abs(marker.getDate().getTime() - timestamp) > Constants.MINUTE_IN_MS * 15) {
+                continue;
+            }
+            final com.eveningoutpost.dexdrip.cgm.carelinkfollow.message.MarkerDataValues values =
+                    marker.data != null ? marker.data.dataValues : null;
+            if (marker.bolusType != null || marker.programmedFastAmount != null
+                    || (values != null && (values.bolusType != null || values.programmedFastAmount != null))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+    private static void writePumpDiagnostics(final RecentData recentData) {
+        if (recentData == null || xdrip.getAppContext() == null) {
+            return;
+        }
+
+        try {
+            File directory = xdrip.getAppContext().getExternalFilesDir(null);
+            if (directory == null) {
+                directory = xdrip.getAppContext().getFilesDir();
+            }
+            final File logFile = new File(directory, "carelink-pump-diagnostics.log");
+            if (logFile.exists() && logFile.length() > MAX_PUMP_DIAGNOSTIC_LOG_BYTES) {
+                if (!logFile.delete()) {
+                    UserError.Log.w(TAG, "Unable to rotate CareLink pump diagnostics log");
+                }
+            }
+
+            try (PrintWriter writer = new PrintWriter(new FileWriter(logFile, true))) {
+                writer.println("--- poll " + JoH.dateTimeText(JoH.tsl()) + " ---");
+                writer.println("family=" + recentData.getDeviceFamily()
+                        + " pumpModel=" + recentData.pumpModelNumber
+                        + " reservoirUnits=" + recentData.reservoirRemainingUnits
+                        + " reservoirAmount=" + recentData.reservoirAmount
+                        + " sensorState=" + recentData.sensorState);
+
+                if (recentData.pumpBannerState != null) {
+                    for (com.eveningoutpost.dexdrip.cgm.carelinkfollow.message.PumpBannerState banner : recentData.pumpBannerState) {
+                        if (banner != null) {
+                            writer.println("banner type=" + banner.type + " timeRemaining=" + banner.timeRemaining);
+                        }
+                    }
+                }
+                if (recentData.notificationHistory != null) {
+                    if (recentData.notificationHistory.activeNotifications != null) {
+                        for (ActiveNotification notification : recentData.notificationHistory.activeNotifications) {
+                            writer.println("activeNotification messageId=" + notification.messageId
+                                    + " faultId=" + notification.faultId + " type=" + notification.type
+                                    + " dateTime=" + notification.dateTime);
+                        }
+                    }
+                    if (recentData.notificationHistory.clearedNotifications != null) {
+                        for (ClearedNotification notification : recentData.notificationHistory.clearedNotifications) {
+                            writer.println("clearedNotification messageId=" + notification.messageId
+                                    + " faultId=" + notification.faultId + " type=" + notification.type
+                                    + " dateTime=" + notification.dateTime
+                                    + " triggeredDateTime=" + notification.triggeredDateTime);
+                        }
+                    }
+                }
+                if (recentData.markers != null) {
+                    for (Marker marker : recentData.markers) {
+                        if (marker != null) {
+                            writer.println("marker type=" + marker.type + " date=" + marker.getDate()
+                                    + " amount=" + marker.amount + " bolusAmount=" + marker.bolusAmount
+                                    + " nestedBolusAmount=" + (marker.data != null && marker.data.dataValues != null
+                                    ? marker.data.dataValues.bolusAmount : null)
+                                    + " bolusType=" + marker.bolusType
+                                    + " nestedBolusType=" + (marker.data != null && marker.data.dataValues != null
+                                    ? marker.data.dataValues.bolusType : null)
+                                    + " programmedFastAmount=" + marker.programmedFastAmount
+                                    + " nestedProgrammedFastAmount=" + (marker.data != null && marker.data.dataValues != null
+                                    ? marker.data.dataValues.programmedFastAmount : null)
+                                    + " activationType=" + marker.activationType
+                                    + " completed=" + marker.completed);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            UserError.Log.w(TAG, "Unable to write CareLink pump diagnostics: " + e.getMessage());
+        }
+    }
 
     static synchronized void processData(final RecentData recentData, final boolean live) {
 
@@ -332,6 +458,8 @@ public class CareLinkDataProcessor {
             UserError.Log.e(TAG, "Recent data is null, processing stopped!");
             return;
         }
+
+        writePumpDiagnostics(recentData);
 
         if (recentData.sgs == null) UserError.Log.d(TAG, "SGs is null!");
 
@@ -537,7 +665,8 @@ public class CareLinkDataProcessor {
         //PUMP INFO (Pump Status)
         if (recentData.isNGP() || recentData.isCC()) {
             final long pumpStatusTimestamp = getPumpStatusTimestamp(recentData);
-            final PumpStatus.ReservoirChange reservoirChange = PumpStatus.updateReservoir(recentData.reservoirRemainingUnits, pumpStatusTimestamp);
+                final PumpStatus.ReservoirChange reservoirChange = PumpStatus.updateReservoir(recentData.reservoirRemainingUnits,
+                    pumpStatusTimestamp, hasUserBolusNearTimestamp(recentData, pumpStatusTimestamp));
             createReservoirChangeTreatment(reservoirChange);
             PumpStatus.setBattery(recentData.getDeviceBatteryLevel());
             if (recentData.gstBatteryLevel > 0) {

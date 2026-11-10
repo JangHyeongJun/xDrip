@@ -476,10 +476,7 @@ public class NightscoutUploader {
         boolean any_successes = false;
         boolean any_failures = false;
         final long THIS_QUEUE = UploaderQueue.NIGHTSCOUT_RESTAPI;
-        List<UploaderQueue> tups = Collections.emptyList();
-        if (Pref.getBooleanDefaultFalse("send_treatments_to_nightscout")) {
-            tups = UploaderQueue.getPendingbyType(Treatments.class.getSimpleName(), THIS_QUEUE);
-        }
+        final List<UploaderQueue> tups = getPendingNightscoutTreatments(THIS_QUEUE);
         for (String baseURI : baseURIs) {
             try {
                 baseURI = TryResolveName(baseURI);
@@ -529,6 +526,25 @@ public class NightscoutUploader {
             PersistentStore.setBoolean(TAG + "_inconsistentMultiSteUpload", true); // There has been inconsistent upload and we have recorded the time.  Let's set the flag.
         }
         return any_successes;
+    }
+
+    private List<UploaderQueue> getPendingNightscoutTreatments(final long queue) {
+        final List<UploaderQueue> pending = UploaderQueue.getPendingbyType(Treatments.class.getSimpleName(), queue);
+        if (Pref.getBooleanDefaultFalse("send_treatments_to_nightscout")) {
+            return pending;
+        }
+
+        final List<UploaderQueue> siteChanges = new ArrayList<>();
+        for (final UploaderQueue upload : pending) {
+            if (!"insert".equals(upload.action) && !"update".equals(upload.action)) {
+                continue;
+            }
+            final Treatments treatment = Treatments.byid(upload.reference_id);
+            if (treatment != null && Treatments.SITE_CHANGE_EVENT_TYPE.equals(treatment.eventType)) {
+                siteChanges.add(upload);
+            }
+        }
+        return siteChanges;
     }
 
     public static void notifyInconsistentMultiSiteUpload() {

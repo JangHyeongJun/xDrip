@@ -327,7 +327,9 @@ public class TextMap {
                 errorTextId = ERROR_TEXT_PREFIX_GUARDIAN + guardianErrorCode;
             else
                 errorTextId = null;
-        } else if (deviceFamily.equals(RecentData.DEVICE_FAMILY_NGP) || deviceFamily.equals(RecentData.DEVICE_FAMILY_CGM)) {
+        } else if (deviceFamily.equals(RecentData.DEVICE_FAMILY_NGP)
+            || deviceFamily.equals(RecentData.DEVICE_FAMILY_CGM)
+            || deviceFamily.equals(RecentData.DEVICE_FAMILY_SIMPLERA)) {
             if(ngpErrorCode.matches("\\d+"))
             {
                 formattedEC = String.format("%03d", Integer.parseInt(ngpErrorCode));

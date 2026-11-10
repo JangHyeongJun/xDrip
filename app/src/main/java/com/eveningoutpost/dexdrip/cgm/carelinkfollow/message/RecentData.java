@@ -11,6 +11,7 @@ public class RecentData {
     public static final String DEVICE_FAMILY_GUARDIAN = "GUARDIAN";
     public static final String DEVICE_FAMILY_NGP = "NGP";
     public static final String DEVICE_FAMILY_CGM = "CGM";
+    public static final String DEVICE_FAMILY_SIMPLERA = "SIMPLERA";
     public static final String DEVICE_FAMILY_CC = "CC"; // Includes Instinct
 
     //sensorState
@@ -66,6 +67,10 @@ public class RecentData {
 
     public boolean isCGM() {
         return getDeviceFamily().equals(DEVICE_FAMILY_CGM);
+    }
+
+    public boolean isSimplera() {
+        return getDeviceFamily().equals(DEVICE_FAMILY_SIMPLERA);
     }
 
     public int getDeviceBatteryLevel(){

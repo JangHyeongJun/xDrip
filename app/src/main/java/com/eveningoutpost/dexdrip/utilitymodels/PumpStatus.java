@@ -27,6 +27,8 @@ public class PumpStatus {
     private static final String PUMP_RESERVOIR_CHANGE = "pump-reservoir-change";
     private static final String TIME = "-time";
     private static final double RESERVOIR_CHANGE_THRESHOLD_UNITS = 1d;
+    private static final double INFUSION_SET_CHANGE_MIN_UNITS = 7d;
+    private static final double INFUSION_SET_CHANGE_MAX_UNITS = 12d;
     private static final long RESERVOIR_CHANGE_DEDUP_WINDOW_MS = Constants.HOUR_IN_MS * 6;
 
     private static String last_json = "";
@@ -35,11 +37,14 @@ public class PumpStatus {
         public final long timestamp;
         public final double previousReservoir;
         public final double currentReservoir;
+        public final boolean infusionSetChange;
 
-        private ReservoirChange(final long timestamp, final double previousReservoir, final double currentReservoir) {
+        private ReservoirChange(final long timestamp, final double previousReservoir, final double currentReservoir,
+                                final boolean infusionSetChange) {
             this.timestamp = timestamp;
             this.previousReservoir = previousReservoir;
             this.currentReservoir = currentReservoir;
+            this.infusionSetChange = infusionSetChange;
         }
     }
 
@@ -84,6 +89,11 @@ public class PumpStatus {
     }
 
     public static ReservoirChange updateReservoir(final double reservoir, final long timestamp) {
+        return updateReservoir(reservoir, timestamp, false);
+    }
+
+    public static ReservoirChange updateReservoir(final double reservoir, final long timestamp,
+                                                  final boolean bolusDelivered) {
         ReservoirChange inferredChange = null;
         final double previousReservoir = PersistentStore.getDouble(PUMP_RESERVOIR_TRACK);
         final long previousTimestamp = PersistentStore.getLong(PUMP_RESERVOIR_TRACK + TIME);
@@ -94,11 +104,18 @@ public class PumpStatus {
             Log.d(TAG, "Reservoir update: previous=" + JoH.qs(previousReservoir, 1)
                     + "U current=" + JoH.qs(reservoir, 1)
                     + "U delta=" + JoH.qs(delta, 1)
-                    + "U threshold=" + JoH.qs(RESERVOIR_CHANGE_THRESHOLD_UNITS, 1) + "U");
-            if (delta >= RESERVOIR_CHANGE_THRESHOLD_UNITS
+                    + "U threshold=" + JoH.qs(RESERVOIR_CHANGE_THRESHOLD_UNITS, 1)
+                    + "U bolusDelivered=" + bolusDelivered);
+                final boolean reservoirRefilled = delta >= RESERVOIR_CHANGE_THRESHOLD_UNITS;
+                final boolean infusionSetPrimed = !bolusDelivered
+                    && delta <= -INFUSION_SET_CHANGE_MIN_UNITS
+                    && delta >= -INFUSION_SET_CHANGE_MAX_UNITS;
+                if ((reservoirRefilled || infusionSetPrimed)
                     && (lastInferredChange == 0 || Math.abs(timestamp - lastInferredChange) > RESERVOIR_CHANGE_DEDUP_WINDOW_MS)) {
-                Log.d(TAG, "Reservoir change detected! Inferred refill from " + JoH.qs(previousReservoir, 1) + "U to " + JoH.qs(reservoir, 1) + "U");
-                inferredChange = new ReservoirChange(timestamp, previousReservoir, reservoir);
+                Log.d(TAG, "Reservoir change detected! "
+                    + (infusionSetPrimed ? "Inferred infusion set prime" : "Inferred refill")
+                    + " from " + JoH.qs(previousReservoir, 1) + "U to " + JoH.qs(reservoir, 1) + "U");
+                inferredChange = new ReservoirChange(timestamp, previousReservoir, reservoir, infusionSetPrimed);
                 PersistentStore.setLong(PUMP_RESERVOIR_CHANGE + TIME, timestamp);
             }
         }
