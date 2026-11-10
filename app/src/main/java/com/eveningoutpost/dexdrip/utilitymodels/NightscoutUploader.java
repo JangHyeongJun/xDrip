@@ -356,7 +356,7 @@ public class NightscoutUploader {
         final String baseURLSettings = prefs.getString("cloud_storage_api_base", "");
         final ArrayList<String> baseURIs = new ArrayList<>();
 
-        boolean new_data = false;
+        boolean new_data = NightscoutTreatments.removePreviouslyImportedDuplicates() > 0;
         Log.d(TAG, "doRESTtreatmentDownload() starting run");
 
         try {

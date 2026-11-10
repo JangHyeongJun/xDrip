@@ -301,7 +301,7 @@ public class Treatments extends Model {
         // GcmActivity.pushTreatmentAsync(Treatment);
         //  NSClientChat.pushTreatmentAsync(Treatment);
 
-        pushTreatmentSync(treatment);
+        pushTreatmentSync(treatment, true, suggested_uuid);
         UndoRedo.addUndoTreatment(treatment.uuid);
         return treatment;
     }
@@ -640,6 +640,18 @@ public class Treatments extends Model {
                 .from(Treatments.class)
                 .where("timestamp = ?", timestamp)
                 .orderBy("timestamp desc")
+                .execute();
+    }
+
+    public static List<Treatments> listByTimestamp(long timestamp, int plus_minus_millis) {
+        if (plus_minus_millis < 0) {
+            throw new IllegalArgumentException("plus_minus_millis must not be negative");
+        }
+        return new Select()
+                .from(Treatments.class)
+                .where("timestamp <= ? and timestamp >= ?", timestamp + plus_minus_millis,
+                        timestamp - plus_minus_millis)
+                .orderBy("abs(timestamp-" + Long.toString(timestamp) + ") asc")
                 .execute();
     }
 
@@ -1473,6 +1485,5 @@ public class Treatments extends Model {
         return notes != null && notes.startsWith("Priming");
     }
 }
-
 
 

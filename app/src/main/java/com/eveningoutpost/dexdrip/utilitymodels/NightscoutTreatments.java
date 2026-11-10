@@ -1,5 +1,6 @@
 package com.eveningoutpost.dexdrip.utilitymodels;
 
+import com.activeandroid.query.Select;
 import com.eveningoutpost.dexdrip.Home;
 import com.eveningoutpost.dexdrip.models.BloodTest;
 import com.eveningoutpost.dexdrip.models.DateUtil;
@@ -14,6 +15,7 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.UUID;
 
 import static com.eveningoutpost.dexdrip.models.Treatments.pushTreatmentSyncToWatch;
@@ -24,9 +26,35 @@ public class NightscoutTreatments {
 
     private static final boolean d = false;
     private static final String TAG = "NightscoutTreatments";
+    static final String DUPLICATE_TREATMENT_CLEANUP_KEY = "nightscout-treatment-duplicate-cleanup-v1";
 
     private static final HashSet<String> bad_uuids = new HashSet<>();
     private static final HashSet<String> bad_bloodtest_uuids = new HashSet<>();
+
+    static int removePreviouslyImportedDuplicates() {
+        if (PersistentStore.getBoolean(DUPLICATE_TREATMENT_CLEANUP_KEY)) {
+            return 0;
+        }
+
+        int removed = 0;
+        final List<Treatments> importedTreatments = new Select()
+                .from(Treatments.class)
+                .where("enteredBy LIKE ?", "%" + NightscoutUploader.VIA_NIGHTSCOUT_TAG)
+                .execute();
+        for (final Treatments imported : importedTreatments) {
+            if (findIdenticalTreatment(imported.timestamp, imported.carbs, imported.insulin,
+                    imported.notes, imported.getId(), true) != null) {
+                UserError.Log.i(TAG, "Removing previously imported duplicate treatment: "
+                        + JoH.dateTimeText(imported.timestamp) + " " + imported.insulin + " " + imported.carbs);
+                imported.delete();
+                removed++;
+            }
+        }
+
+        PersistentStore.setBoolean(DUPLICATE_TREATMENT_CLEANUP_KEY, true);
+        UserError.Log.i(TAG, "Completed imported treatment duplicate cleanup: removed " + removed);
+        return removed;
+    }
 
     public static boolean processTreatmentResponse(final String response) throws Exception {
         boolean new_data = false;
@@ -133,12 +161,15 @@ public class NightscoutTreatments {
                     Treatments existing = Treatments.byuuid(nightscout_id);
                     if (existing == null)
                         existing = Treatments.byuuid(uuid);
+                    if (existing != null && isNightscoutDuplicate(existing, timestamp, carbs, insulin, notes)) {
+                        UserError.Log.i(TAG, "Removing previously imported duplicate treatment: "
+                                + JoH.dateTimeText(existing.timestamp) + " " + insulin + " " + carbs);
+                        existing.delete();
+                        existing = null;
+                        new_data = true;
+                    }
                     if ((existing == null) && !(from_xdrip && skip_from_xdrip)) {
-                        // check for close timestamp duplicates perhaps
-                        existing = Treatments.byTimestamp(timestamp, 60000);
-                        if (!((existing != null) && (JoH.roundDouble(existing.insulin, 2) == JoH.roundDouble(insulin, 2))
-                                && (JoH.roundDouble(existing.carbs, 2) == JoH.roundDouble(carbs, 2))
-                                && ((existing.notes == null && notes == null) || ((existing.notes != null) && existing.notes.equals(notes != null ? notes : ""))))) {
+                        if (findIdenticalTreatment(timestamp, carbs, insulin, notes, null, false) == null) {
 
                             UserError.Log.ueh(TAG, "New Treatment from Nightscout: Carbs: " + carbs + " Insulin: " + insulin + " timestamp: " + JoH.dateTimeText(timestamp) + ((notes != null) ? " Note: " + notes : ""));
                             final Treatments t;
@@ -206,5 +237,39 @@ public class NightscoutTreatments {
             }
         }
         return new_data;
+    }
+
+    private static boolean isNightscoutDuplicate(final Treatments treatment, final long timestamp,
+                                                final double carbs, final double insulin, final String notes) {
+        if (treatment.enteredBy == null || !treatment.enteredBy.endsWith(NightscoutUploader.VIA_NIGHTSCOUT_TAG)) {
+            return false;
+        }
+        return findIdenticalTreatment(timestamp, carbs, insulin, notes, treatment.getId(), true) != null;
+    }
+
+    private static Treatments findIdenticalTreatment(final long timestamp, final double carbs,
+                                                     final double insulin, final String notes,
+                                                     final Long excludedId, final boolean requireNonNightscout) {
+        for (final Treatments candidate : Treatments.listByTimestamp(timestamp, 60000)) {
+            if ((excludedId == null || !excludedId.equals(candidate.getId()))
+                    && (!requireNonNightscout || !isImportedFromNightscout(candidate))
+                    && isIdenticalTreatment(candidate, carbs, insulin, notes)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private static boolean isImportedFromNightscout(final Treatments treatment) {
+        return treatment.enteredBy != null
+                && treatment.enteredBy.endsWith(NightscoutUploader.VIA_NIGHTSCOUT_TAG);
+    }
+
+    private static boolean isIdenticalTreatment(final Treatments treatment, final double carbs,
+                                                final double insulin, final String notes) {
+        return JoH.roundDouble(treatment.insulin, 2) == JoH.roundDouble(insulin, 2)
+                && JoH.roundDouble(treatment.carbs, 2) == JoH.roundDouble(carbs, 2)
+                && ((treatment.notes == null && notes == null)
+                || ((treatment.notes != null) && treatment.notes.equals(notes != null ? notes : "")));
     }
 }
